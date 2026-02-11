@@ -24,31 +24,42 @@ def save_last_news(news):
         json.dump(news, f, ensure_ascii=False)
 
 def fetch_latest_news():
-    resp = requests.get(URL)
-    soup = BeautifulSoup(resp.text, "html.parser")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Connection": "keep-alive"
+    }
 
-    # новости в h2 (заголовок) и h3 (дата)
-    news_headers = soup.find_all("h2")
-    if not news_headers:
+    resp = requests.get(URL, headers=headers, timeout=30)
+
+    # Проверим, не вернул ли сайт страницу блокировки
+    if "You are unable to access" in resp.text:
+        print("Сайт блокирует запрос (anti-bot).")
         return None
 
-    # Берём первую (самую свежую) новость
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    news_headers = soup.find_all("h2")
+    if not news_headers:
+        print("Новости не найдены.")
+        return None
+
     title = news_headers[0].get_text(strip=True)
 
-    # Дата в следующем h3 после h2
     date_elem = news_headers[0].find_next_sibling("h3")
     date = date_elem.get_text(strip=True) if date_elem else "нет даты"
 
-    # Ссылка на подробности — первый <a> после даты
     link_elem = date_elem.find_next("a") if date_elem else None
     link = "https://visas-it.tlscontact.com" + link_elem["href"] if link_elem else URL
 
-    news = {
+    return {
         "title": title,
         "date": date,
         "link": link
     }
-    return news
 
 def send_telegram(news):
     text = f"📢 <b>Новая новость на TLScontact</b>\n\n" \
